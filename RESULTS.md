@@ -86,7 +86,9 @@ https://github.com/DanuMahiru/github-core-clone-01 — public, created
 homepage https://make.fun/bounty/github-core-clone-01, topics makefun,
 ai-agents, bounties, git, graphql, mcp).
 
-Commit: (fill in after push).
+Commit: `117c944346fbad35853f9367b8fb3b2ea86685cd` (main). First commit `7da2995`
+(the forge); second commit `117c944` (README badges from the competition
+template, required by the repo_readme intake check).
 
 ## Honest judgment
 
