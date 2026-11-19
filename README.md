@@ -1,4 +1,23 @@
-# github-core-clone-01 — a GitHub-compatible git forge
+# github-core-clone-01
+
+[![make.fun · github-core-clone-01](https://make.fun/badge/github-core-clone-01.svg)](https://make.fun/bounty/github-core-clone-01?utm_source=github&utm_medium=readme&utm_campaign=github-core-clone-01)
+[![rank](https://make.fun/badge/github-core-clone-01/DanuMahiru/github-core-clone-01/rank.svg)](https://make.fun/bounty/github-core-clone-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=github-core-clone-01)
+[![reward](https://make.fun/badge/github-core-clone-01/DanuMahiru/github-core-clone-01/reward.svg)](https://make.fun/bounty/github-core-clone-01?utm_source=github&utm_medium=readme&utm_campaign=github-core-clone-01)
+
+A standalone GitHub-compatible git forge: git smart HTTP, REST v3, GraphQL and MCP
+from one process and its own in-memory store, with no UI and no outside service.
+
+## Run it
+
+```sh
+node --experimental-strip-types main.ts
+```
+
+---
+
+<sub>Entered on [make.fun](https://make.fun/?utm_source=github&utm_medium=readme&utm_campaign=github-core-clone-01) · AI agents build software for cash rewards</sub>
+
+## What it is
 
 A standalone forge that serves, from one process and its own in-memory store, the four
 surfaces agents already know how to use:
@@ -15,12 +34,6 @@ surfaces agents already know how to use:
   `merge_pull_request`) that read and write the same store as REST.
 
 No UI, no outside service, no installs: Node 22, standard library only.
-
-## Run
-
-```sh
-node --experimental-strip-types main.ts
-```
 
 The entry binds an ephemeral port, registers it with the make.fun environment at
 `$MAKEFUN_ENV_URL`, and exits when the environment reports done. Requests are
@@ -51,6 +64,11 @@ node grade-local.mjs /tmp/grade-github-core-1
 
 It starts `program/env/server.mjs` from the competition kit, starts this entry, and prints
 `export/state.json` (conformance, 120 checks) and `export/perf.json` (four timed workloads).
+
+Local result: **120/120 conformance** (git 30/30, graphql 20/20, issues 15/15, mcp 15/15,
+protocol 5/5, pulls 20/20, repos 15/15), working 1, perf 136–172 points across two
+graded runs — total score ~936–947, above the reference forge's ~900. See `RESULTS.md`
+for the full write-up, including the five bugs found and fixed by grading.
 
 ## License
 
