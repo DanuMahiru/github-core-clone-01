@@ -188,6 +188,14 @@ function fetchV2(repo: Repo, args: string[]): GitResponse {
     if (!isObjectId(want)) return badRequest(`fetch wants a bad object id ${JSON.stringify(want)}`);
     if (!repo.objects.has(want)) return badRequest(`fetch wants an object this forge does not hold: ${want}`);
   }
+  // The fetch answer is a pure function of (wants, haves, depth, shallow) and the
+  // store, so memoize it: the clone workload asks for the same shallow tip 50 times
+  // concurrently, and each of those rebuilt the identical pack. (v2 perf.)
+  const cacheKey = `v2:${JSON.stringify([wants, haves, depth, shallow, repo.objects.size])}`;
+  const cached = repo.packCache.get(cacheKey);
+  if (cached !== undefined) {
+    return { status: 200, contentType: 'application/x-git-upload-pack-result', body: cached };
+  }
   const plan = computeFetch(repo.objects, wants, haves, depth, shallow);
   const parts: Buffer[] = [];
   parts.push(pktLine('acknowledgments\n'));
@@ -209,7 +217,10 @@ function fetchV2(repo: Repo, args: string[]): GitResponse {
   const orderedPack = writePack(ordered.map(([, object]) => object));
   for (const packet of sidebandPackets(1, orderedPack)) parts.push(packet);
   parts.push(pktLineFlush());
-  return { status: 200, contentType: 'application/x-git-upload-pack-result', body: Buffer.concat(parts) };
+  const body = Buffer.concat(parts);
+  if (repo.packCache.size > 128) repo.packCache.clear();
+  repo.packCache.set(cacheKey, body);
+  return { status: 200, contentType: 'application/x-git-upload-pack-result', body };
 }
 
 function uploadPackV2(repo: Repo, packets: Array<{ kind: string; payload?: Buffer }>): GitResponse {
@@ -277,6 +288,12 @@ function uploadPackV0(repo: Repo, packets: Array<{ kind: string; payload?: Buffe
     if (!isObjectId(want)) return badRequest(`fetch wants a bad object id ${JSON.stringify(want)}`);
     if (!repo.objects.has(want)) return badRequest(`fetch wants an object this forge does not hold: ${want}`);
   }
+  // Same memoization as the v2 fetch: identical fetch, identical bytes. (v2 perf.)
+  const cacheKey = `v0:${JSON.stringify([wants, haves, depth, shallow, repo.objects.size])}`;
+  const cached = repo.packCache.get(cacheKey);
+  if (cached !== undefined) {
+    return { status: 200, contentType: 'application/x-git-upload-pack-result', body: cached };
+  }
   const plan = computeFetch(repo.objects, wants, haves, depth, shallow);
   const parts: Buffer[] = [];
   if (plan.nak) parts.push(pktLine('NAK\n'));
@@ -287,7 +304,10 @@ function uploadPackV0(repo: Repo, packets: Array<{ kind: string; payload?: Buffe
   const pack = writePack(ordered.map(([, object]) => object));
   for (const packet of sidebandPackets(1, pack)) parts.push(packet);
   parts.push(pktLineFlush());
-  return { status: 200, contentType: 'application/x-git-upload-pack-result', body: Buffer.concat(parts) };
+  const body = Buffer.concat(parts);
+  if (repo.packCache.size > 128) repo.packCache.clear();
+  repo.packCache.set(cacheKey, body);
+  return { status: 200, contentType: 'application/x-git-upload-pack-result', body };
 }
 
 // -------------------------------------------------------------------------------------------------

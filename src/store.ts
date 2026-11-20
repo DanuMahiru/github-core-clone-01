@@ -83,6 +83,15 @@ export interface Repo {
   prSeq: number;
   comments: Map<number, Comment[]>;
   commentSeq: number;
+  /**
+   * Memoized upload-pack response bodies, keyed by the fetch parameters plus the
+   * object-store size (v2 perf: the clone workload fires 50 concurrent shallow
+   * clones of the same tip, and every one of them rebuilt the identical pack).
+   * The key is sound because the store is content-addressed and only grows within
+   * a repo's lifetime — same size plus same parameters means same bytes — and the
+   * cache dies with the repo when the repo is deleted. Capped by the caller.
+   */
+  packCache: Map<string, Buffer>;
   createdAt: string;
   updatedAt: string;
 }
@@ -161,6 +170,7 @@ export class Forge {
       prSeq: 1,
       comments: new Map(),
       commentSeq: 1,
+      packCache: new Map(),
       createdAt: nowIso(),
       updatedAt: nowIso(),
     };

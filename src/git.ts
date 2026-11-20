@@ -584,9 +584,12 @@ export function reachableObjects(
   const objects = new Map<string, GitObject>();
   const commits = new Set<string>();
   const boundaries = new Set<string>();
-  // Depth-first from each tip, tracking distance from the nearest tip.
+  // Depth-first from each tip, tracking distance from the nearest tip. The queue is
+  // walked with an index, not shift(): shift() re-indexes the whole array on every
+  // pop, which turns a 200-commit walk quadratic. (v2 perf.)
   const queue: Array<{ oid: string; depth: number }> = [];
   for (const tip of tips) queue.push({ oid: tip, depth: 0 });
+  let queueHead = 0;
   const visitedCommits = new Map<string, number>();
   const addObject = (oid: string): void => {
     const object = store.get(oid);
@@ -601,8 +604,9 @@ export function reachableObjects(
       if (entry.mode === '40000') addTree(entry.sha);
     }
   };
-  while (queue.length > 0) {
-    const { oid, depth } = queue.shift() as { oid: string; depth: number };
+  while (queueHead < queue.length) {
+    const { oid, depth } = queue[queueHead] as { oid: string; depth: number };
+    queueHead += 1;
     const known = visitedCommits.get(oid);
     if (known !== undefined && known <= depth) continue;
     visitedCommits.set(oid, depth);
@@ -632,16 +636,34 @@ export function reachableObjects(
 /** Whether `ancestor` is an ancestor of (or equal to) `descendant`. */
 export function isAncestor(store: ObjectStore, ancestor: string, descendant: string): boolean {
   if (ancestor === descendant) return true;
-  return reachableCommits(store, [descendant]).has(ancestor);
+  // Walk down from the descendant and stop the moment the ancestor is found. A
+  // fast-forward check only needs that answer, not the whole reachable history: the
+  // old form walked every reachable commit first, so each push on a 200-deep branch
+  // paid for all 200 commits even though its old tip is usually the direct parent.
+  // (v2 perf: this is the push workload's hot path — 200 sequential pushes.)
+  const seen = new Set<string>();
+  const stack: string[] = [descendant];
+  while (stack.length > 0) {
+    const oid = stack.pop() as string;
+    if (seen.has(oid)) continue;
+    seen.add(oid);
+    if (oid === ancestor) return true;
+    const object = store.get(oid);
+    if (object === undefined || object.type !== 'commit') continue;
+    for (const parent of parseCommit(object.data).parents) stack.push(parent);
+  }
+  return false;
 }
 
 /** The merge base of two commits: the first common ancestor found walking from `b`. */
 export function mergeBase(store: ObjectStore, a: string, b: string): string | null {
   const ancestorsOfA = reachableCommits(store, [a]);
   const queue: string[] = [b];
+  let queueHead = 0;
   const seen = new Set<string>();
-  while (queue.length > 0) {
-    const oid = queue.shift() as string;
+  while (queueHead < queue.length) {
+    const oid = queue[queueHead] as string;
+    queueHead += 1;
     if (seen.has(oid)) continue;
     seen.add(oid);
     if (ancestorsOfA.has(oid)) return oid;
